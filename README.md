@@ -223,8 +223,7 @@ Slant-Game/
 │   ├── index.html          # Main UI
 │   ├── style.css           # Styling
 │   └── script.js           # Frontend logic
-├── docs/
-│   └── README.md           # This file
+├── README.md               # This file
 ├── GAME_RULES.md           # Detailed game rules
 ├── GREEDY_STRATEGIES.md    # AI strategy documentation
 └── requirements.txt        # Python dependencies
