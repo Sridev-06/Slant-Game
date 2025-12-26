@@ -254,19 +254,47 @@ class SlantGame:
         backtrack(0, 0)
         return count
 
-    def solve_game(self, randomize=False):
+    def solve_game(self, randomize=False, strategy=None):
         # Backtracking solver
         # Returns True if solved, False otherwise
         
         # Verify if current state has cycles? (Should be maintained by moves)
         
-        empty_cell = self._find_empty_cell()
-        if not empty_cell:
-            return True # All filled
-            
-        r, c = empty_cell
+        # [GREEDY UPDATE]: Choose cell based on strategy if provided
+        if strategy:
+             # Lazy import to avoid circular dependency
+             from cpu_ai import GreedyAI
+             ai = GreedyAI(self, strategy)
+             # Step 1: Candidate Generation & Selection (Greedy Best Cell)
+             r, c = -1, -1
+             best_cell = ai.get_best_empty_cell() # New helper method
+             if best_cell:
+                 r, c = best_cell
+             else:
+                 # No empty valid cells found (or all dead ends)
+                 # Verify completion
+                 if self._find_empty_cell() is None:
+                     return True # Truly full
+                 else:
+                     return False # Stuck! (Greedy failure)
+        else:
+             # Standard First Empty Logic
+             empty_cell = self._find_empty_cell()
+             if not empty_cell:
+                 return True # All filled
+             r, c = empty_cell
+             
+        # [GREEDY UPDATE]: Choose move order based on strategy
         moves = ['L', 'R']
-        if randomize:
+        if strategy:
+             # Lazy import again not needed if scope is same
+             # Step 2 & 3: Local Evaluation & Choose Optimal Move
+             # get_move_order returns ['L', 'R'] or ['R', 'L'] sorted by score
+             from cpu_ai import GreedyAI # Safety
+             ai = GreedyAI(self, strategy) 
+             moves = ai.get_move_order(r, c)
+             
+        elif randomize:
             random.shuffle(moves)
             
         for mv in moves:
@@ -276,11 +304,35 @@ class SlantGame:
             if self.is_move_valid(r, c, mv):
                 self.apply_move(r, c, mv)
                 
-                if self.solve_game(randomize):
+                if self.solve_game(randomize, strategy):
                     return True
-                    
-                self.undo() # Backtrack
                 
+                # [GREEDY STRICT]: User requested "Greedy Alone" (No Backtracking).
+                if strategy:
+                    return False # Fail branch if valid move leads to dead end
+
+                self.undo() # Backtrack
+
+        # [FORCE FILL]: If we are here and using strategy, it means we have NO valid moves.
+        # But user requested to fill strictly. So we FORCE a move (Invalid).
+        if strategy:
+            # Force 'L', if checking fails (best effort)
+            # Actually, we should just pick the move that was 'better' scored, and force it.
+            mv = moves[0] 
+            # Force apply without validity check (hacky but satisfies request)
+            # Warning: apply_move might assert. Let's rely on internal ability or ignore constraints.
+            
+            # Since apply_move does NOT check validity inside (it assumes caller did),
+            # we can just call it! But we must be careful not to create weird graph states if possible.
+            # However, cycle detection relies on valid moves.
+            
+            # Let's just TRY the first move again, but skip validation.
+            self.apply_move(r, c, mv, check_validity=False)
+            if self.solve_game(randomize, strategy):
+                 return True
+            # No backtrack here either
+            return False
+
         return False
 
     def _find_empty_cell(self):
@@ -684,46 +736,62 @@ class SlantGame:
         visited = set()
         parent_map = {} # To reconstruct path
         
-        # Reset previous loop cells
-        self.loop_cells = []
+        return found_any
+
+    def _detect_visual_diamonds(self):
+        """
+        [USER REQUEST]: Only visualize 2x2 "Diamond" loops (/\ over \/).
+        Returns a list of cell coordinates [(r,c), ...] that form such diamonds.
+        """
+        diamonds = []
+        for r in range(self.size - 1):
+            for c in range(self.size - 1):
+                # Check 2x2 block for:
+                # Top-Left (r,c) = R (/)
+                # Top-Right (r,c+1) = L (\)
+                # Bottom-Left (r+1,c) = L (\)
+                # Bottom-Right (r+1,c+1) = R (/)
+                if (self.grid[r][c] == 'R' and 
+                    self.grid[r][c+1] == 'L' and
+                    self.grid[r+1][c] == 'L' and
+                    self.grid[r+1][c+1] == 'R'):
+                    
+                    diamonds.append((r, c))
+                    diamonds.append((r, c+1))
+                    diamonds.append((r+1, c))
+                    diamonds.append((r+1, c+1))
+                    
+        return diamonds
+
+    def detect_cycle_dfs(self):
+        """
+        [REVIEW 1 REQUIREMENT]: Graph Algorithm (DFS)
+        Detects cycles using Depth First Search on the Adjacency List representation.
+        Returns True if a cycle exists.
         
-        found_any = False
+        [VISUAL UPDATE]: self.loop_cells is now RESTRICTED to 2x2 Diamonds only.
+        """
+        # 1. Update visual loop cells (Only Diamonds)
+        self.loop_cells = self._detect_visual_diamonds()
+        
+        # 2. Perform actual cycle check for logic return value
+        graph = self.get_graph_representation()
+        visited = set()
         
         def dfs(node, parent):
-            nonlocal found_any
             visited.add(node)
-            parent_map[node] = parent
-            
             for neighbor in graph[node]:
-                if neighbor == parent:
-                    continue
-                if neighbor in visited:
-                    # Cycle found! 
-                    found_any = True
-                    cycle_nodes = [neighbor, node]
-                    curr = node
-                    while curr != neighbor and curr in parent_map:
-                        curr = parent_map[curr]
-                        if curr:
-                            cycle_nodes.append(curr)
-                        if curr == neighbor: break
-                            
-                    for i in range(len(cycle_nodes)-1):
-                        u, v = cycle_nodes[i], cycle_nodes[i+1]
-                        self._find_cell_for_edge(u, v)
-
-                    continue # Do NOT return True, keep checking other branches/edges
-                
-                dfs(neighbor, node)
-                # We ignore return value since we rely on found_any and loop_cells population
-            
-            return False # Return irrelevant now
+                if neighbor == parent: continue
+                if neighbor in visited: return True
+                if dfs(neighbor, node): return True
+            return False
 
         for node in graph:
             if node not in visited:
-                dfs(node, None)
+                if dfs(node, None):
+                    return True
                 
-        return found_any
+        return False
 
     def _find_cell_for_edge(self, u, v):
         # Identify the grid cell connecting node u and node v
