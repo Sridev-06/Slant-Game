@@ -3,14 +3,17 @@
 > A graph theory-based puzzle game featuring greedy algorithms, constraint satisfaction, and cycle detection
 
 ## 📋 Table of Contents
-- [Overview](#overview)
-- [Game Rules](#game-rules)
-- [How to Play](#how-to-play)
-- [Scoring System](#scoring-system)
-- [Game Modes](#game-modes)
-- [Installation & Setup](#installation--setup)
-- [Technical Details](#technical-details)
-- [Strategy Guide](#strategy-guide)
+- [Overview](#-overview)
+- [Game Rules](#-game-rules)
+- [How to Play](#-how-to-play)
+- [Scoring System](#-scoring-system)
+- [Game Modes](#-game-modes)
+- [Installation & Setup](#-installation--setup)
+- [Technical Details](#-technical-details)
+- [Strategy Guide](#-strategy-guide)
+- [Educational Value](#-educational-value)
+- [Troubleshooting](#-troubleshooting)
+- [License & Credits](#-license--credits)
 
 ---
 
