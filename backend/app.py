@@ -99,10 +99,12 @@ def set_strategy():
 @app.route('/api/solve', methods=['POST'])
 def solve_game():
     # Attempt to solve the game from current state
-    if game.solve_game(randomize=False):
+    if game.solve_game(randomize=True, strategy=selected_strategy):
         return jsonify({"success": True, "state": game.to_dict(), "message": "Solved!"})
     else:
-        return jsonify({"success": False, "state": game.to_dict(), "message": "No solution found"}), 400
+
+        msg = "No more valid greedy moves" if selected_strategy else "No solution found"
+        return jsonify({"success": False, "state": game.to_dict(), "message": msg}), 400
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)
